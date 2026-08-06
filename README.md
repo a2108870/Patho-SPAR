@@ -28,7 +28,7 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
-## Try it
+## Installation check
 
 Run the bundled smoke test before supplying a checkpoint:
 

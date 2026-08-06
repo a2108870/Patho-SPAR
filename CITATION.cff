@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "Citation metadata is anonymized during double-blind peer review."
+title: "Beyond ℓₚ Perturbations: A Stain-Physics Threat Model for Digital Pathology"
+type: software
+version: 0.1.0
+authors:
+  - name: "Anonymous authors"
+date-released: 2026-08-06
+repository-code: "https://github.com/a2108870/Patho-SPAR"
+license: MIT

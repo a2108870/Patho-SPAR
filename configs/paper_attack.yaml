@@ -1,0 +1,13 @@
+# Main worst-case robustness configuration reported in the Patho-SPAR paper.
+num_frequencies: 4
+spatial_concentration_bound: 0.20
+global_concentration_bound: 0.20
+rotation_bound_radians: 0.10
+od_offset_bound: 0.10
+steps: 100
+learning_rate: 0.10
+margin: 0.10
+gradient_clip: 1.0
+init_scale: 0.01
+od_threshold: 0.15
+angular_percentile: 99.0

@@ -1,0 +1,6 @@
+torch>=1.13
+numpy>=1.23
+Pillow>=9.0
+PyYAML>=6.0
+timm>=0.6.12
+tqdm>=4.64

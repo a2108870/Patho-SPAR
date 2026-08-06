@@ -7,6 +7,19 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- A provenance-labelled real H&E installation example and checkpoint-free
+  smoke test.
+- Automatic sidecar JSON reports for single-image attacks.
+- Explicit command-line preprocessing selection for ImageNet-normalized and
+  self-preprocessing classifiers.
+
+### Changed
+
+- Expanded installation, troubleshooting, and model-input guidance for new
+  users.
+
 ## [0.1.0] - 2026-08-06
 
 ### Added

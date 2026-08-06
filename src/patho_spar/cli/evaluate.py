@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from patho_spar import PathoSPAR, imagenet_normalize
+from patho_spar import PathoSPAR
 from patho_spar.data import ManifestDataset, save_rgb_image
 
 from .common import (
@@ -42,7 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
-    device, config, model = load_runtime(args)
+    device, config, model, normalize = load_runtime(args)
     dataset = ManifestDataset(args.manifest, args.data_root, args.image_size)
     loader = DataLoader(
         dataset,
@@ -51,7 +51,7 @@ def main() -> None:
         num_workers=args.workers,
         pin_memory=device.type == "cuda",
     )
-    attack = PathoSPAR(model, config)
+    attack = PathoSPAR(model, config, normalize=normalize)
 
     total = 0
     clean_correct = 0
@@ -64,7 +64,8 @@ def main() -> None:
         labels = labels.to(device)
         total += int(labels.numel())
         with torch.no_grad():
-            clean_predictions = model(imagenet_normalize(images)).argmax(dim=1)
+            classifier_inputs = normalize(images) if normalize is not None else images
+            clean_predictions = model(classifier_inputs).argmax(dim=1)
         correct = clean_predictions.eq(labels)
         clean_correct += int(correct.sum().item())
         if not bool(correct.any()):
@@ -102,6 +103,8 @@ def main() -> None:
         "checkpoint_sha256": sha256_file(args.checkpoint),
         "architecture": args.architecture,
         "num_classes": args.num_classes,
+        "normalization": args.normalization,
+        "image_size": args.image_size,
         "total_images": total,
         "initially_correct": clean_correct,
         "successful_attacks": successful,

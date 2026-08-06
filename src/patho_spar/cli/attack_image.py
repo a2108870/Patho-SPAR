@@ -18,24 +18,39 @@ def build_parser() -> argparse.ArgumentParser:
     add_attack_arguments(parser)
     parser.add_argument("--image", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--report",
+        type=Path,
+        help="JSON report path; defaults to the output image path with a .json suffix",
+    )
     parser.add_argument("--image-size", type=int, default=224)
     return parser
 
 
+def resolve_report_path(output: Path, report: Path | None) -> Path:
+    """Choose an explicit report destination or the image sidecar path."""
+
+    return report if report is not None else output.with_suffix(".json")
+
+
 def main() -> None:
     args = build_parser().parse_args()
-    device, config, model = load_runtime(args)
+    device, config, model, normalize = load_runtime(args)
     image = load_rgb_image(args.image, args.image_size).unsqueeze(0).to(device)
-    result = PathoSPAR(model, config)(image)
+    result = PathoSPAR(model, config, normalize=normalize)(image)
     save_rgb_image(result.adversarial_images[0], args.output)
+    report_path = resolve_report_path(args.output, args.report)
 
     report = {
         "input": str(args.image),
         "output": str(args.output),
+        "report": str(report_path),
         "checkpoint": str(args.checkpoint.resolve()),
         "checkpoint_sha256": sha256_file(args.checkpoint),
         "architecture": args.architecture,
         "num_classes": args.num_classes,
+        "normalization": args.normalization,
+        "image_size": args.image_size,
         "clean_prediction": int(result.clean_predictions[0].item()),
         "adversarial_prediction": int(result.adversarial_predictions[0].item()),
         "success": bool(result.success[0].item()),
@@ -44,6 +59,8 @@ def main() -> None:
         "seed": args.seed,
         "configuration": config.to_dict(),
     }
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))
 
 

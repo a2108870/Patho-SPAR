@@ -14,6 +14,20 @@ contains the differentiable renderer, classifier-guided worst-case search,
 single-image interface, manifest-based evaluation, tests, and the attack
 configuration used in the manuscript.
 
+## Start here
+
+Patho-SPAR is an **attack-only** package: it evaluates a fixed classifier and
+does not train one. A new user can follow this path:
+
+1. Install a PyTorch build appropriate for the local CPU or CUDA device.
+2. Install this package and run the bundled smoke test on a real H&E patch.
+3. Supply a compatible local classifier checkpoint to attack one image or
+   evaluate a CSV manifest.
+
+The smoke test is intentionally checkpoint-free. It verifies that image
+loading, the differentiable renderer, and classifier-guided optimization run
+end to end; it is not a pathology benchmark.
+
 ## Double-blind review
 
 This repository is anonymized for peer review. Citation metadata, package
@@ -21,13 +35,16 @@ metadata, release history, and commit authorship intentionally omit identifying
 information. Author information and the final citation will be restored after
 the review process.
 
-Datasets, classifier checkpoints, training pipelines, online augmentation,
-competing attacks, and private experiment orchestration are not distributed.
+Classifier checkpoints, training pipelines, online augmentation, competing
+attacks, and private experiment orchestration are not distributed. One
+attributed NCT-CRC-HE-100K patch is included solely as an installation example.
 
 ## Installation
 
-Python 3.8 or later is required. Install a PyTorch build compatible with the
-local CUDA environment, then install Patho-SPAR:
+Python 3.8 or later is required. First install the PyTorch build recommended
+for the local operating system and CUDA version from
+[pytorch.org](https://pytorch.org/get-started/locally/). Then install
+Patho-SPAR:
 
 ```bash
 git clone https://github.com/a2108870/Patho-SPAR.git
@@ -37,6 +54,31 @@ source .venv/bin/activate              # Windows: .venv\Scripts\activate
 python -m pip install --upgrade pip
 python -m pip install -e .
 ```
+
+Confirm that PyTorch can see the intended device:
+
+```bash
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
+```
+
+`False` is expected on CPU-only installations. GPU acceleration is recommended
+for dataset-scale evaluation but is not required for the smoke test.
+
+### Verify the installation on a real H&E patch
+
+```bash
+python examples/smoke_test.py
+```
+
+This command reads [`examples/nct_crc_tum_example.png`](examples/nct_crc_tum_example.png),
+runs the renderer and optimization loop with a small demonstration classifier,
+and writes `outputs/smoke_test_patho_spar.png`. The bundled tile is a real,
+Macenko-normalized 224 by 224 H&E image from the `TUM` class of
+[NCT-CRC-HE-100K](https://doi.org/10.5281/zenodo.1214456), released under
+CC BY 4.0. It is included for software verification only; see
+[`examples/README.md`](examples/README.md) for provenance and use conditions.
+
+![Bundled real H&E example](examples/nct_crc_tum_example.png)
 
 For development:
 
@@ -49,9 +91,9 @@ python -m pytest -q
 
 ## Quick start
 
-The classifier must accept normalized tensors and return logits. Patho-SPAR
-expects floating-point RGB tensors in `[0, 1]` with shape
-`[batch, 3, height, width]`.
+Patho-SPAR expects floating-point **unnormalized** RGB tensors in `[0, 1]`
+with shape `[batch, 3, height, width]`. The classifier must return logits of
+shape `[batch, num_classes]`.
 
 ```python
 from patho_spar import PathoSPAR, PathoSPARConfig
@@ -67,9 +109,10 @@ success = result.success
 first_success_step = result.first_success_step
 ```
 
-ImageNet normalization is applied by default because the evaluated classifiers
-use ImageNet-pretrained ResNet-50 and Swin-Tiny backbones. For a classifier that
-performs its own preprocessing, pass `normalize=None`.
+By default, ImageNet normalization is applied immediately before classifier
+inference because the manuscript classifiers use ImageNet-pretrained
+ResNet-50 and Swin-Tiny backbones. If the supplied model performs its own
+preprocessing, use `PathoSPAR(model, config, normalize=None)` instead.
 
 ## Command-line interfaces
 
@@ -83,14 +126,18 @@ patho-spar-attack \
   --architecture resnet50 \
   --num-classes 2 \
   --checkpoint checkpoints/cam17_resnet50_224.pth \
-  --image examples/patch.png \
+  --image examples/nct_crc_tum_example.png \
   --output outputs/patch_patho_spar.png \
   --config configs/paper_attack.yaml \
   --device cuda:0
 ```
 
-The command saves the adversarial patch and reports the clean prediction,
-adversarial prediction, success status, and first successful optimization step.
+The command saves the adversarial patch and, by default, a sidecar JSON report
+at `outputs/patch_patho_spar.json`. The report records the clean and attacked
+predictions, success status, first successful step, seed, preprocessing mode,
+configuration, and checkpoint SHA-256. Use `--report path/to/report.json` to
+choose another report location. Add `--normalization none` only when the model
+contains its own input preprocessing.
 
 ### Evaluate a manifest
 
@@ -124,7 +171,7 @@ success rate as:
 > **ASR = successful attacks on initially correct samples / initially correct samples.**
 
 The JSON output records the configuration, clean-correct count, successful
-attack count, and class-transition counts.
+attack count, class-transition counts, image size, and preprocessing mode.
 
 ## Method summary
 
@@ -172,6 +219,10 @@ All patches are resized to `224 x 224`, converted to RGB tensors in `[0, 1]`,
 and normalized immediately before classifier inference with ImageNet mean
 `(0.485, 0.456, 0.406)` and standard deviation `(0.229, 0.224, 0.225)`.
 The renderer always operates on unnormalized RGB values in `[0, 1]`.
+
+For command-line evaluation, `--normalization imagenet` is the default and
+matches the manuscript protocol. Use `--normalization none` only for models
+whose `forward` method already applies the required input preprocessing.
 
 Classifier checkpoints are not included. The SHA-256 digest of the reference
 Camelyon17 ResNet-50 checkpoint is:
@@ -224,7 +275,7 @@ admissible perturbation spaces, not a shared attack radius.
 Patho-SPAR/
 |-- .github/                      # CI and contribution templates
 |-- configs/paper_attack.yaml     # Manuscript attack configuration
-|-- examples/manifest.example.csv # Evaluation-manifest schema
+|-- examples/                     # Real H&E verification tile and runnable examples
 |-- src/patho_spar/               # Renderer, search, data, and CLI code
 |-- tests/                        # Numerical and API tests
 |-- CONTRIBUTING.md
@@ -255,6 +306,22 @@ python -m build
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow and
 [SECURITY.md](SECURITY.md) for private vulnerability reporting.
+
+## Troubleshooting
+
+**`torch.cuda.is_available()` is `False`.** The package can run on CPU, but
+large evaluations will be slow. Reinstall PyTorch using the command selected
+for the local CUDA setup on [pytorch.org](https://pytorch.org/get-started/locally/).
+
+**Checkpoint keys do not match.** Confirm the `timm` architecture and
+`--num-classes` used to train the checkpoint. Strict loading is the default;
+`--non-strict-checkpoint` is intended only for users who have independently
+verified that the missing or unexpected keys are harmless.
+
+**Predictions look incorrect.** Check preprocessing first. The renderer must
+receive unnormalized RGB tensors in `[0, 1]`; select `--normalization imagenet`
+for models trained with ImageNet normalization, or `none` when the model
+preprocesses its own inputs.
 
 ## Citation
 

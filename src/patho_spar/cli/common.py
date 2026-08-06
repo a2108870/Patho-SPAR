@@ -6,12 +6,17 @@ import argparse
 import hashlib
 import random
 from pathlib import Path
+from typing import Callable, Optional, Tuple
 
 import numpy as np
 import torch
+from torch import Tensor, nn
 
 from patho_spar.config import PathoSPARConfig
 from patho_spar.modeling import load_timm_classifier
+from patho_spar.normalization import imagenet_normalize
+
+NormalizeFn = Callable[[Tensor], Tensor]
 
 
 def add_model_arguments(parser: argparse.ArgumentParser) -> None:
@@ -27,6 +32,15 @@ def add_model_arguments(parser: argparse.ArgumentParser) -> None:
         "--non-strict-checkpoint",
         action="store_true",
         help="allow missing or unexpected checkpoint keys",
+    )
+    parser.add_argument(
+        "--normalization",
+        choices=("imagenet", "none"),
+        default="imagenet",
+        help=(
+            "preprocessing applied immediately before classifier inference; "
+            "use 'none' when the model performs its own preprocessing"
+        ),
     )
 
 
@@ -53,6 +67,16 @@ def set_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
+def resolve_normalizer(name: str) -> Optional[NormalizeFn]:
+    """Return the classifier-input transform selected by a CLI user."""
+
+    if name == "imagenet":
+        return imagenet_normalize
+    if name == "none":
+        return None
+    raise ValueError(f"unknown normalization option: {name}")
+
+
 def sha256_file(path: str | Path) -> str:
     digest = hashlib.sha256()
     with Path(path).open("rb") as handle:
@@ -61,7 +85,9 @@ def sha256_file(path: str | Path) -> str:
     return digest.hexdigest()
 
 
-def load_runtime(args: argparse.Namespace):
+def load_runtime(
+    args: argparse.Namespace,
+) -> Tuple[torch.device, PathoSPARConfig, nn.Module, Optional[NormalizeFn]]:
     device = resolve_device(args.device)
     set_seed(args.seed)
     config = (
@@ -74,4 +100,4 @@ def load_runtime(args: argparse.Namespace):
         device,
         strict=not args.non_strict_checkpoint,
     )
-    return device, config, model
+    return device, config, model, resolve_normalizer(args.normalization)
